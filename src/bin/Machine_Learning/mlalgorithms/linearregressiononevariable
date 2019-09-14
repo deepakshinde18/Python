@@ -1,0 +1,34 @@
+%To view plots after 'plot' (and other plot-producing commands) this command must follow: 'print -dpng some_unique_plot_name.png;'
+%It exports current plot to png image which then is sent to your browser
+%GNU Octave 4.0.0
+
+function J = computeCost(X, y, theta)
+    m = length(y); % number of training examples
+    J = 0;
+    J = sum((X*theta - y).^2)/(2*m);
+end
+
+function [theta, J_history] = gradientDescent(X, y, theta, alpha, num_iters)
+    % Initialize some useful values
+    m = length(y); % number of training examples
+    J_history = zeros(num_iters, 1);
+ 
+    for iter = 1:num_iters
+        theta = theta - (alpha / m) * (X' * (X * theta - y)); 
+        % Save the cost J in every iteration so we can later track how it is converging
+        J_history(iter) = computeCost(X,y,theta);
+    end
+ 
+end
+
+X = [1;2;3;4;5];
+y = [1;2;3;4;5];
+m = length(y);
+X = [ones(m, 1), X];
+n = size(X, 2);
+theta = zeros(n, 1);
+iterations = 1500;
+alpha = 0.01;
+computeCost(X, y, theta);
+theta = gradientDescent(X, y, theta, alpha, iterations);
+predict1 = [1, 3.5] *theta

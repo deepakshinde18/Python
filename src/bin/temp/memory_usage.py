@@ -39,4 +39,4 @@ t2 = time.clock()
 # t2 = time.clock()
 
 print('Memory (After): {}Mb'.format(memory_profiler.memory_usage()))
-print('Took {} Seconds'.format(t2-t1))
+print('Took {} Seconds to run this'.format(t2-t1))

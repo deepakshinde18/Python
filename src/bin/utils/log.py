@@ -74,10 +74,10 @@ class GenericLogging(object):
             handler_fnames = ['module_name.log']
             handlers.extend([self._build_handler_shortcut(fname) for fname in
                              handler_fnames])
-        #elif:
-        #    pass
-        #else:
-        #    pass
+        # elif:
+        #     pass
+        # else:
+        #     pass
         return handlers
 
 

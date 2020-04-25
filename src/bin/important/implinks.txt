@@ -1,0 +1,3 @@
+spark to hive connection
+    https://acadgild.com/blog/how-to-access-hive-tables-to-spark-sql
+

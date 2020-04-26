@@ -1,3 +1,5 @@
 spark to hive connection
     https://acadgild.com/blog/how-to-access-hive-tables-to-spark-sql
 
+YARN Configuration
+    https://web.archive.org/web/20170610145449/http://hortonworks.com/blog/how-to-plan-and-configure-yarn-in-hdp-2-0/

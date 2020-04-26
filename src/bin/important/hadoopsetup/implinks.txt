@@ -3,3 +3,9 @@ spark to hive connection
 
 YARN Configuration
     https://web.archive.org/web/20170610145449/http://hortonworks.com/blog/how-to-plan-and-configure-yarn-in-hdp-2-0/
+
+mysql server setup
+    https://www.digitalocean.com/community/tutorials/how-to-install-mysql-on-ubuntu-18-04
+
+HIVE Metastore Configuration with MYSQL
+    https://www.guru99.com/hive-metastore-configuration-mysql.html

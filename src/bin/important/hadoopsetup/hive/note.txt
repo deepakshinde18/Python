@@ -1,0 +1,1 @@
+copy guava-27.0-jre.jar from hadoop lib to hive lib

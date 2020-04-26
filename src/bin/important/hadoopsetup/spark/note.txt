@@ -1,0 +1,3 @@
+1) copy mysql-connector-java-5.1.45.jar in jars folder of spark
+2) copy hive-site.xml to conf dir of spark so that default spark session we will get of hive db
+

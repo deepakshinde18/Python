@@ -1,0 +1,1 @@
+copy mysql-connector-java.jar in libe folder of sqoop so that sqoop will connect to mysql db to import data

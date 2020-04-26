@@ -13,3 +13,6 @@ HIVE Metastore Configuration with MYSQL
 Sqoop: Import Data From MySQL to Hive
     https://dzone.com/articles/sqoop-import-data-from-mysql-to-hive
 
+Sqoop import and export
+    https://www.google.com/amp/s/acadgild.com/blog/sqoop-import-data-from-mysql-to-hive/amp
+

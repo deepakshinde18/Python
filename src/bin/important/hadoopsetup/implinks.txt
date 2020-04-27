@@ -16,3 +16,5 @@ Sqoop: Import Data From MySQL to Hive
 Sqoop import and export
     https://www.google.com/amp/s/acadgild.com/blog/sqoop-import-data-from-mysql-to-hive/amp
 
+Pyspark integration in jupyter notebook
+    https://stackoverflow.com/questions/36917103/how-to-run-custom-python-script-on-jupyter-notebook-launch-to-boot-spark

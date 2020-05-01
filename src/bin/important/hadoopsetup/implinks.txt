@@ -18,3 +18,9 @@ Sqoop import and export
 
 Pyspark integration in jupyter notebook
     https://stackoverflow.com/questions/36917103/how-to-run-custom-python-script-on-jupyter-notebook-launch-to-boot-spark
+
+spark yarn client vs cluster deploy mode
+    https://stackoverflow.com/questions/41124428/spark-yarn-cluster-vs-client-how-to-choose-which-one-to-use/41142747
+
+Hadoop YARN cluster mode setup
+    https://www.linode.com/docs/databases/hadoop/install-configure-run-spark-on-top-of-hadoop-yarn-cluster/

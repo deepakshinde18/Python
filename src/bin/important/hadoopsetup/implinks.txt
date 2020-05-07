@@ -9,6 +9,8 @@ mysql server setup
 
 HIVE Metastore Configuration with MYSQL
     https://www.guru99.com/hive-metastore-configuration-mysql.html
+HIVE Configure Remote Metastore
+    http://staging.hadooptutorial.info/hive-metastore-configuration/
 
 Sqoop: Import Data From MySQL to Hive
     https://dzone.com/articles/sqoop-import-data-from-mysql-to-hive

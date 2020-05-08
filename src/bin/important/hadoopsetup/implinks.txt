@@ -26,3 +26,6 @@ spark yarn client vs cluster deploy mode
 
 Hadoop YARN cluster mode setup
     https://www.linode.com/docs/databases/hadoop/install-configure-run-spark-on-top-of-hadoop-yarn-cluster/
+    
+Hadoop setup with 2 namenodes
+    https://www.edureka.co/blog/how-to-set-up-hadoop-cluster-with-hdfs-high-availability/

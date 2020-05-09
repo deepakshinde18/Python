@@ -24,6 +24,9 @@ Pyspark integration in jupyter notebook
 spark yarn client vs cluster deploy mode
     https://stackoverflow.com/questions/41124428/spark-yarn-cluster-vs-client-how-to-choose-which-one-to-use/41142747
 
+SparkSession vs. SparkContext vs. SQLContext vs. HiveContext
+    https://www.hadoopinrealworld.com/sparksession-vs-sparkcontext-vs-sqlcontext-vs-hivecontext/
+
 Hadoop YARN cluster mode setup
     https://www.linode.com/docs/databases/hadoop/install-configure-run-spark-on-top-of-hadoop-yarn-cluster/
     

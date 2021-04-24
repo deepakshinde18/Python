@@ -32,3 +32,10 @@ Hadoop YARN cluster mode setup
     
 Hadoop setup with 2 namenodes
     https://www.edureka.co/blog/how-to-set-up-hadoop-cluster-with-hdfs-high-availability/
+
+Command to find header file
+    sudo apt-get install apt-file
+    sudo apt-file update
+    apt-file search <headerfilename eg lber.h>
+
+

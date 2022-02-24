@@ -94,3 +94,8 @@ def extract_week(ds):
     week = ds_to_datetime(ds).isocalendar()[1]
     return week
 
+def unix_to_date(unix_date):
+    # unix_date is epoch time for eg. 1457308800
+    # above value is equal to 2016-03-07 and this is what it will return
+    return datetime.utcfromtimestamp(unix_date).strftime('%Y-%m-%d')
+

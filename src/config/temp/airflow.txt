@@ -1,0 +1,3 @@
+https://skwrites.in/setting-up-apache-airflow-cluster/
+https://blogs.halodoc.io/airflow-cluster-architecture-at-halodoc-self-managed-challenges-and-learnings/
+https://medium.com/softwaresanders/setting-up-an-apache-airflow-cluster-60fbd8a93276

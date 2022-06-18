@@ -8,3 +8,7 @@ Python install from source
 # Postgres
 1) https://www.cherryservers.com/blog/how-to-install-and-setup-postgresql-server-on-ubuntu-20-04
 2) https://www.postgresql.org/download/linux/ubuntu/
+
+#Docker
+1) https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-20-04
+2) https://phoenixnap.com/kb/install-docker-compose-on-ubuntu-20-04

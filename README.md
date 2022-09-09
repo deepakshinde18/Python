@@ -12,3 +12,6 @@ Python install from source
 # Docker
 1) https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-20-04
 2) https://phoenixnap.com/kb/install-docker-compose-on-ubuntu-20-04
+
+# Jupyter Notebook
+1) https://edaoud.com/blog/2020/12/04/setup-jupyter-lab-with-kernels-widgets/

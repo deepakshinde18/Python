@@ -15,3 +15,7 @@ Python install from source
 
 # Jupyter Notebook
 1) https://edaoud.com/blog/2020/12/04/setup-jupyter-lab-with-kernels-widgets/
+
+# On rhel 8 azure vm though you open port in portal it will not work. you have to specifically open firewall port on vm
+1) https://linuxconfig.org/redhat-8-open-and-close-ports
+2) https://linuxconfig.org/install-nginx-on-redhat-8

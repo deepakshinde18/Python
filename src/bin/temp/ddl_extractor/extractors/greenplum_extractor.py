@@ -223,20 +223,36 @@ class GreenplumDDLExtractor:
         with self.pool.get() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute("""
-                    SELECT partitiontablename, partitionrangestart, partitionrangeend,
-                           partitionlistvalues, partitionisdefault, partitiontype,
-                           partitionhashmodulus, partitionhashremainder, partitioncolumn
-                    FROM pg_partitions
-                    WHERE schemaname = %s AND tablename = %s
+                    SELECT pr.parname,
+                           pr.parisdefault,
+                           pr.parrangestart,
+                           pr.parrangeend,
+                           pr.parlistvalues,
+                           pr.parhashmodulus,
+                           pr.parhashremainder,
+                           p.parkind,
+                           (SELECT array_agg(attname ORDER BY attnum)
+                            FROM pg_attribute
+                            WHERE attrelid = p.parrelid
+                              AND attnum = ANY (p.paratts)) AS partition_columns
+                    FROM pg_partition_rule pr
+                    JOIN pg_partition p ON p.oid = pr.paroid
+                    JOIN pg_class t ON t.oid = p.parrelid
+                    JOIN pg_namespace n ON n.oid = t.relnamespace
+                    WHERE n.nspname = %s
+                      AND t.relname = %s
+                    ORDER BY pr.parruleord;
                 """, (schema, table))
+    
                 for row in cur.fetchall():
-                    key = "d" if row.get("partitionisdefault") else row["partitiontype"]
+                    key = "d" if row["parisdefault"] else row["parkind"]
                     strategy = PartitionStrategyRegistry.get(key)
                     if strategy:
                         stmt = strategy.child_clause(row, schema, table)
                         if stmt:
                             parts_sqls.append(stmt)
         return parts_sqls
+
 
     def _detect_partition_clause(self, fq_table: str) -> Optional[str]:
         schema, table = self._split_qualified(fq_table)

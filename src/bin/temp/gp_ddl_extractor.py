@@ -80,7 +80,8 @@ class DDLExtractor:
         return TableDef(schema=schema, name=table, columns=cols, pk_cols=pk_cols)
 
     # ---------------- Convert to Postgres DDL ----------------
-    def to_postgres_ddl(self, t: TableDef, include_if_not_exists: bool = True) -> str:
+        def to_postgres_ddl(self, t: TableDef, include_if_not_exists: bool = True) -> str:
+        # ---- columns ----
         col_lines = []
         for c in t.columns:
             dt = c.data_type
@@ -100,13 +101,50 @@ class DDLExtractor:
             if t.pk_cols else ""
         )
         ine = "IF NOT EXISTS " if include_if_not_exists else ""
+
+        # ---- detect partitioning ----
+        partition_clause = self._detect_partition_clause(f"{t.schema}.{t.name}")
+
         ddl = (
             f"CREATE TABLE {ine}\"{t.schema}\".\"{t.name}\" (\n"
             + ",\n".join(col_lines)
             + pk_sql
-            + "\n);"
+            + "\n)"
+            + (f" {partition_clause}" if partition_clause else "")
+            + ";"
         )
         return ddl
+
+    def _detect_partition_clause(self, fq_table: str) -> Optional[str]:
+        """
+        Return a Postgres-compatible PARTITION BY clause
+        if the table is partitioned in Greenplum.
+        """
+        schema, table = self._split_qualified(fq_table)
+        with self.pool.get() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                cur.execute("""
+                    SELECT partitiontype, partitioncolumn
+                    FROM pg_partitions
+                    WHERE schemaname = %s AND tablename = %s
+                    LIMIT 1;
+                """, (schema, table))
+                row = cur.fetchone()
+                if not row:
+                    return None
+
+                ptype = row["partitiontype"]
+                pcol = row["partitioncolumn"]
+
+                if ptype == 'r':
+                    return f"PARTITION BY RANGE ({pcol})"
+                elif ptype == 'l':
+                    return f"PARTITION BY LIST ({pcol})"
+                elif ptype == 'h':
+                    return f"PARTITION BY HASH ({pcol})"
+                else:
+                    return None
+
 
     # ---------------- Distribution Clause ----------------
     def get_distribution_clause(self, fq_table: str) -> str:
@@ -163,7 +201,7 @@ class DDLExtractor:
 
     #### below is the updated for load partition to include list partition
 
-            def load_partitions(self, fq_table: str) -> List[str]:
+    def load_partitions(self, fq_table: str) -> List[str]:
         """
         Convert Greenplum partitions into Postgres PARTITION OF statements.
         Supports RANGE, LIST, and DEFAULT partitions.
@@ -182,14 +220,14 @@ class DDLExtractor:
                     WHERE schemaname = %s AND tablename = %s
                     ORDER BY partitionrangestart, partitionlistvalues
                 """, (schema, table))
-
+    
                 for row in cur.fetchall():
                     pname = row["partitiontablename"]
                     start = row["partitionrangestart"]
                     end = row["partitionrangeend"]
                     listvals = row["partitionlistvalues"]
                     is_default = row["partitionisdefault"]
-
+    
                     if is_default:  # DEFAULT partition
                         sql_stmt = (
                             f"CREATE TABLE {schema}.{pname} PARTITION OF {schema}.{table} DEFAULT;"
@@ -206,9 +244,9 @@ class DDLExtractor:
                         )
                     else:
                         continue  # HASH or unsupported type for now
-
+    
                     parts_sqls.append(sql_stmt)
-
+    
         return parts_sqls
 
 

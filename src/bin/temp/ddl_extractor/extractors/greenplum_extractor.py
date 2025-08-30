@@ -358,9 +358,14 @@ SELECT
     END AS partition_type,
     pr.parisdefault AS is_default,
     array_agg(att.attname ORDER BY att.attnum) AS partition_columns,
-    pr.parrangestart AS range_start,
-    pr.parrangeend AS range_end,
-    pr.parlistvalues AS list_values
+    -- full SQL-style definition
+    pg_get_partition_def(pr.oid) AS partition_definition,
+    -- extract range start (if applicable)
+    regexp_replace(pg_get_partition_def(pr.oid), '.*START \''||'(.*?)'||'\'.*', '\1') AS range_start,
+    -- extract range end (if applicable)
+    regexp_replace(pg_get_partition_def(pr.oid), '.*END \''||'(.*?)'||'\'.*', '\1') AS range_end,
+    -- extract list values (if applicable)
+    regexp_replace(pg_get_partition_def(pr.oid), '.*IN \((.*)\).*', '\1') AS list_values
 FROM
     pg_partition_rule pr
 JOIN
@@ -370,7 +375,7 @@ JOIN
 JOIN
     pg_namespace n ON n.oid = t.relnamespace
 JOIN
-    pg_class c_child ON c_child.oid = pr.parchildrelid  -- get actual partition table
+    pg_class c_child ON c_child.oid = pr.parchildrelid
 LEFT JOIN
     LATERAL (
         SELECT attname, attnum
@@ -385,8 +390,7 @@ GROUP BY
     c_child.relname,
     p.parkind,
     pr.parisdefault,
-    pr.parrangestart,
-    pr.parrangeend,
-    pr.parlistvalues
+    pr.oid
 ORDER BY
     c_child.relname;
+

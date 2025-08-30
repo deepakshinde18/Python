@@ -349,27 +349,43 @@ class GreenplumDDLExtractor:
 
 
 SELECT
-    pr.parname,
-    pr.parisdefault,
-    pr.parrangestart,
-    pr.parrangeend,
-    pr.parlistvalues,
-    pr.parhashmodulus,
-    pr.parhashremainder,
-    p.parkind,
-    (
-        SELECT array_agg(attname ORDER BY attnum)
+    pr.parname AS partition_name,
+    CASE p.parkind
+        WHEN 'r' THEN 'range'
+        WHEN 'l' THEN 'list'
+        WHEN 'h' THEN 'hash'
+        ELSE 'unknown'
+    END AS partition_type,
+    pr.parisdefault AS is_default,
+    array_agg(att.attname ORDER BY att.attnum) AS partition_columns,
+    pr.parrangestart AS range_start,
+    pr.parrangeend AS range_end,
+    pr.parlistvalues AS list_values
+FROM
+    pg_partition_rule pr
+JOIN
+    pg_partition p ON p.oid = pr.paroid
+JOIN
+    pg_class t ON t.oid = p.parrelid
+JOIN
+    pg_namespace n ON n.oid = t.relnamespace
+LEFT JOIN
+    LATERAL (
+        SELECT attname, attnum
         FROM pg_attribute
         WHERE attrelid = p.parrelid
           AND attnum = ANY (p.paratts)
-    ) AS partition_columns
-FROM
-    pg_partition_rule pr
-JOIN pg_partition p ON p.oid = pr.paroid
-JOIN pg_class t ON t.oid = p.parrelid
-JOIN pg_namespace n ON n.oid = t.relnamespace
+    ) att ON true
 WHERE
     n.nspname = %s
     AND t.relname = %s
+GROUP BY
+    pr.parname,
+    p.parkind,
+    pr.parisdefault,
+    pr.parrangestart,
+    pr.parrangeend,
+    pr.parlistvalues
 ORDER BY
     pr.parruleord;
+

@@ -347,3 +347,29 @@ class GreenplumDDLExtractor:
             return fq.split(".", 1)
         return "public", fq
 
+
+SELECT
+    pr.parname,
+    pr.parisdefault,
+    pr.parrangestart,
+    pr.parrangeend,
+    pr.parlistvalues,
+    pr.parhashmodulus,
+    pr.parhashremainder,
+    p.parkind,
+    (
+        SELECT array_agg(attname ORDER BY attnum)
+        FROM pg_attribute
+        WHERE attrelid = p.parrelid
+          AND attnum = ANY (p.paratts)
+    ) AS partition_columns
+FROM
+    pg_partition_rule pr
+JOIN pg_partition p ON p.oid = pr.paroid
+JOIN pg_class t ON t.oid = p.parrelid
+JOIN pg_namespace n ON n.oid = t.relnamespace
+WHERE
+    n.nspname = %s
+    AND t.relname = %s
+ORDER BY
+    pr.parruleord;

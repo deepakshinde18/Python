@@ -350,17 +350,16 @@ class GreenplumDDLExtractor:
 
 WITH part_defs AS (
   SELECT
-    pr.oid                     AS pr_oid,
     p.parkind,
     pr.parisdefault,
     pr.parchildrelid,
     p.parrelid,
     p.paratts,
-    pg_get_partition_def(pr.oid) AS partition_definition
+    pg_get_partition_def(pr.parchildrelid) AS partition_definition
   FROM pg_partition_rule pr
-  JOIN pg_partition p       ON p.oid = pr.paroid
-  JOIN pg_class t           ON t.oid = p.parrelid
-  JOIN pg_namespace n       ON n.oid = t.relnamespace
+  JOIN pg_partition p ON p.oid = pr.paroid
+  JOIN pg_class t     ON t.oid = p.parrelid
+  JOIN pg_namespace n ON n.oid = t.relnamespace
   WHERE n.nspname = %s
     AND t.relname = %s
 )
@@ -372,11 +371,11 @@ SELECT
     WHEN 'h' THEN 'hash'
     ELSE 'unknown'
   END AS partition_type,
-  part_defs.parisdefault   AS is_default,
+  part_defs.parisdefault AS is_default,
   array_agg(att.attname ORDER BY att.attnum) AS partition_columns,
   part_defs.partition_definition,
 
-  -- range start / end (text)
+  -- range start / end
   CASE WHEN part_defs.parkind = 'r'
        THEN regexp_replace(part_defs.partition_definition,
                            '.*START ''([^'']*)''.*', E'\\1')
@@ -388,14 +387,14 @@ SELECT
        ELSE NULL
   END AS range_end,
 
-  -- list values (text inside IN(...))
+  -- list values
   CASE WHEN part_defs.parkind = 'l'
        THEN regexp_replace(part_defs.partition_definition,
                            E'.*IN \\(([^)]*)\\).*', E'\\1')
        ELSE NULL
   END AS list_values,
 
-  -- hash modulus / remainder (parsed integers from definition)
+  -- hash modulus / remainder
   CASE WHEN part_defs.parkind = 'h'
        THEN regexp_replace(part_defs.partition_definition,
                            E'.*modulus ([0-9]+).*', E'\\1')::int

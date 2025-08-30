@@ -393,3 +393,77 @@ GROUP BY
     pr.parlistvalues
 ORDER BY
     c_child.relname;
+
+
+
+WITH part_defs AS (
+    SELECT
+        pr.oid                AS rule_oid,
+        pr.parchildrelid,
+        p.parrelid,
+        p.paratts,
+        p.parkind,
+        pr.parisdefault,
+        pr.parrangestart,
+        pr.parrangeend,
+        pr.parlistvalues,
+        COUNT(*) OVER (PARTITION BY p.oid) AS hash_modulus -- total child rules under this parent
+    FROM pg_partition_rule pr
+    JOIN pg_partition p ON p.oid = pr.paroid
+    JOIN pg_class t ON t.oid = p.parrelid
+    JOIN pg_namespace n ON n.oid = t.relnamespace
+    WHERE n.nspname = %s
+      AND t.relname = %s
+)
+SELECT
+    c_child.relname AS partition_name,
+    CASE part_defs.parkind
+        WHEN 'r' THEN 'range'
+        WHEN 'l' THEN 'list'
+        WHEN 'h' THEN 'hash'
+        ELSE 'unknown'
+    END AS partition_type,
+    part_defs.parisdefault AS is_default,
+    array_agg(att.attname ORDER BY att.attnum) AS partition_columns,
+
+    -- range values
+    CASE WHEN part_defs.parkind = 'r'
+         THEN pg_get_expr(part_defs.parrangestart, part_defs.parrelid)
+    END AS range_start,
+    CASE WHEN part_defs.parkind = 'r'
+         THEN pg_get_expr(part_defs.parrangeend, part_defs.parrelid)
+    END AS range_end,
+
+    -- list values
+    CASE WHEN part_defs.parkind = 'l'
+         THEN pg_get_expr(part_defs.parlistvalues, part_defs.parrelid)
+    END AS list_values,
+
+    -- hash values
+    CASE WHEN part_defs.parkind = 'h'
+         THEN part_defs.hash_modulus
+    END AS hash_modulus,
+    CASE WHEN part_defs.parkind = 'h'
+         THEN pg_get_expr(part_defs.parlistvalues, part_defs.parrelid)
+    END AS hash_remainder
+
+FROM part_defs
+JOIN pg_class c_child ON c_child.oid = part_defs.parchildrelid
+LEFT JOIN LATERAL (
+    SELECT attname, attnum
+    FROM pg_attribute
+    WHERE attrelid = part_defs.parrelid
+      AND attnum = ANY (part_defs.paratts)
+) att ON true
+GROUP BY
+    c_child.relname,
+    part_defs.parkind,
+    part_defs.parisdefault,
+    part_defs.parrangestart,
+    part_defs.parrangeend,
+    part_defs.parlistvalues,
+    part_defs.parrelid,
+    part_defs.hash_modulus
+ORDER BY
+    c_child.relname;
+

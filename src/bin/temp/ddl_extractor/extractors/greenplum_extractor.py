@@ -358,14 +358,34 @@ SELECT
     END AS partition_type,
     pr.parisdefault AS is_default,
     array_agg(att.attname ORDER BY att.attnum) AS partition_columns,
-    -- full SQL-style definition
     pg_get_partition_def(pr.oid) AS partition_definition,
-    -- extract range start (if applicable)
-    regexp_replace(pg_get_partition_def(pr.oid), '.*START \''||'(.*?)'||'\'.*', '\1') AS range_start,
-    -- extract range end (if applicable)
-    regexp_replace(pg_get_partition_def(pr.oid), '.*END \''||'(.*?)'||'\'.*', '\1') AS range_end,
-    -- extract list values (if applicable)
-    regexp_replace(pg_get_partition_def(pr.oid), '.*IN \((.*)\).*', '\1') AS list_values
+
+    -- range start/end (only valid for range partitions)
+    CASE WHEN p.parkind = 'r'
+         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*START ''(.*?)''.*', '\1')
+         ELSE NULL
+    END AS range_start,
+    CASE WHEN p.parkind = 'r'
+         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*END ''(.*?)''.*', '\1')
+         ELSE NULL
+    END AS range_end,
+
+    -- list values (only valid for list partitions)
+    CASE WHEN p.parkind = 'l'
+         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*IN \\((.*)\\).*', '\1')
+         ELSE NULL
+    END AS list_values,
+
+    -- hash modulus/remainder (parsed from definition text)
+    CASE WHEN p.parkind = 'h'
+         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*modulus ([0-9]+).*', '\1')::int
+         ELSE NULL
+    END AS hash_modulus,
+    CASE WHEN p.parkind = 'h'
+         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*remainder ([0-9]+).*', '\1')::int
+         ELSE NULL
+    END AS hash_remainder
+
 FROM
     pg_partition_rule pr
 JOIN
@@ -393,4 +413,3 @@ GROUP BY
     pr.oid
 ORDER BY
     c_child.relname;
-

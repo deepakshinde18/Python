@@ -161,6 +161,52 @@ class DDLExtractor:
                     parts_sqls.append(sql_stmt)
         return parts_sqls
 
+    #### below is the updated for load partition to include list partition
+
+        def load_partitions(self, fq_table: str) -> List[str]:
+        """
+        Convert Greenplum partitions into Postgres PARTITION OF statements.
+        Supports RANGE and LIST partitions.
+        """
+        schema, table = self._split_qualified(fq_table)
+        parts_sqls: List[str] = []
+        with self.pool.get() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
+                cur.execute("""
+                    SELECT partitiontablename,
+                           partitionrangestart,
+                           partitionrangeend,
+                           partitionlistvalues
+                    FROM pg_partitions
+                    WHERE schemaname = %s AND tablename = %s
+                    ORDER BY partitionrangestart, partitionlistvalues
+                """, (schema, table))
+
+                for row in cur.fetchall():
+                    pname = row["partitiontablename"]
+                    start = row["partitionrangestart"]
+                    end = row["partitionrangeend"]
+                    listvals = row["partitionlistvalues"]
+
+                    if listvals:  # LIST partition
+                        # Example in GP: '1,2,3' → need parentheses in PG
+                        sql_stmt = (
+                            f"CREATE TABLE {schema}.{pname} PARTITION OF {schema}.{table} "
+                            f"FOR VALUES IN ({listvals});"
+                        )
+                    elif start is not None and end is not None:  # RANGE partition
+                        sql_stmt = (
+                            f"CREATE TABLE {schema}.{pname} PARTITION OF {schema}.{table} "
+                            f"FOR VALUES FROM ('{start}') TO ('{end}');"
+                        )
+                    else:
+                        continue  # unsupported type (HASH, DEFAULT, etc.)
+
+                    parts_sqls.append(sql_stmt)
+
+        return parts_sqls
+
+
     # ---------------- Helper ----------------
     @staticmethod
     def _split_qualified(fq: str) -> Tuple[str, str]:
@@ -168,3 +214,20 @@ class DDLExtractor:
             s, t = fq.split('.', 1)
             return s, t
         return 'public', fq
+
+
+###### below is the code to call for class
+def ensure_target_table(self, tdef: TableDef, ddlx: DDLExtractor):
+    ddl = ddlx.to_postgres_ddl(tdef)
+    with self.dst_pool.get() as conn:
+        with conn.cursor() as cur:
+            log.info("Ensuring target table exists: %s.%s", tdef.schema, tdef.name)
+            cur.execute(ddl)
+
+            # Add partitions if any
+            part_ddls = ddlx.load_partitions(f"{tdef.schema}.{tdef.name}")
+            for pddl in part_ddls:
+                cur.execute(pddl)
+
+            conn.commit()
+

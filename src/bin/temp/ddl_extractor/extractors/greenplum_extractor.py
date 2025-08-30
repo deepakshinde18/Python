@@ -243,7 +243,7 @@ class GreenplumDDLExtractor:
         with self.pool.get() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute("""
-                    SELECT partype,
+                    SELECT p.parkind,
                            (SELECT array_agg(attname ORDER BY attnum)
                             FROM pg_attribute
                             WHERE attrelid = p.parrelid
@@ -258,10 +258,11 @@ class GreenplumDDLExtractor:
                 row = cur.fetchone()
                 if not row:
                     return None
-                strategy = PartitionStrategyRegistry.get(row["partype"])
+                strategy = PartitionStrategyRegistry.get(row["parkind"])
                 if strategy and row["cols"]:
                     return strategy.parent_clause(", ".join(row["cols"]))
                 return None
+
 
     # ------------------------
     # Generate DDL

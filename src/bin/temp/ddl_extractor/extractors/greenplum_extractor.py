@@ -243,16 +243,25 @@ class GreenplumDDLExtractor:
         with self.pool.get() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cur:
                 cur.execute("""
-                    SELECT partitiontype, partitioncolumn
-                    FROM pg_partitions
-                    WHERE schemaname = %s AND tablename = %s
-                    LIMIT 1
+                    SELECT partype,
+                           (SELECT array_agg(attname ORDER BY attnum)
+                            FROM pg_attribute
+                            WHERE attrelid = p.parrelid
+                              AND attnum = ANY (p.paratts)) AS cols
+                    FROM pg_partition p
+                    JOIN pg_class t   ON t.oid = p.parrelid
+                    JOIN pg_namespace n ON n.oid = t.relnamespace
+                    WHERE n.nspname = %s
+                      AND t.relname = %s
+                    LIMIT 1;
                 """, (schema, table))
                 row = cur.fetchone()
                 if not row:
                     return None
-                strategy = PartitionStrategyRegistry.get(row["partitiontype"])
-                return strategy.parent_clause(row["partitioncolumn"]) if strategy else None
+                strategy = PartitionStrategyRegistry.get(row["partype"])
+                if strategy and row["cols"]:
+                    return strategy.parent_clause(", ".join(row["cols"]))
+                return None
 
     # ------------------------
     # Generate DDL

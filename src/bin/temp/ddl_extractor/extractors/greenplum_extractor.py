@@ -348,68 +348,76 @@ class GreenplumDDLExtractor:
         return "public", fq
 
 
-SELECT
-    c_child.relname AS partition_name,
-    CASE p.parkind
-        WHEN 'r' THEN 'range'
-        WHEN 'l' THEN 'list'
-        WHEN 'h' THEN 'hash'
-        ELSE 'unknown'
-    END AS partition_type,
-    pr.parisdefault AS is_default,
-    array_agg(att.attname ORDER BY att.attnum) AS partition_columns,
-    pg_get_partition_def(pr.oid) AS partition_definition,
-
-    -- range start/end (only valid for range partitions)
-    CASE WHEN p.parkind = 'r'
-         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*START ''(.*?)''.*', '\1')
-         ELSE NULL
-    END AS range_start,
-    CASE WHEN p.parkind = 'r'
-         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*END ''(.*?)''.*', '\1')
-         ELSE NULL
-    END AS range_end,
-
-    -- list values (only valid for list partitions)
-    CASE WHEN p.parkind = 'l'
-         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*IN \\((.*)\\).*', '\1')
-         ELSE NULL
-    END AS list_values,
-
-    -- hash modulus/remainder (parsed from definition text)
-    CASE WHEN p.parkind = 'h'
-         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*modulus ([0-9]+).*', '\1')::int
-         ELSE NULL
-    END AS hash_modulus,
-    CASE WHEN p.parkind = 'h'
-         THEN regexp_replace(pg_get_partition_def(pr.oid), '.*remainder ([0-9]+).*', '\1')::int
-         ELSE NULL
-    END AS hash_remainder
-
-FROM
-    pg_partition_rule pr
-JOIN
-    pg_partition p ON p.oid = pr.paroid
-JOIN
-    pg_class t ON t.oid = p.parrelid
-JOIN
-    pg_namespace n ON n.oid = t.relnamespace
-JOIN
-    pg_class c_child ON c_child.oid = pr.parchildrelid
-LEFT JOIN
-    LATERAL (
-        SELECT attname, attnum
-        FROM pg_attribute
-        WHERE attrelid = p.parrelid
-          AND attnum = ANY (p.paratts)
-    ) att ON true
-WHERE
-    n.nspname = %s
-    AND t.relname = %s
-GROUP BY
-    c_child.relname,
+WITH part_defs AS (
+  SELECT
+    pr.oid                     AS pr_oid,
     p.parkind,
     pr.parisdefault,
-    pr.oid
-ORDER BY
-    c_child.relname;
+    pr.parchildrelid,
+    p.parrelid,
+    p.paratts,
+    pg_get_partition_def(pr.oid) AS partition_definition
+  FROM pg_partition_rule pr
+  JOIN pg_partition p       ON p.oid = pr.paroid
+  JOIN pg_class t           ON t.oid = p.parrelid
+  JOIN pg_namespace n       ON n.oid = t.relnamespace
+  WHERE n.nspname = %s
+    AND t.relname = %s
+)
+SELECT
+  c_child.relname AS partition_name,
+  CASE part_defs.parkind
+    WHEN 'r' THEN 'range'
+    WHEN 'l' THEN 'list'
+    WHEN 'h' THEN 'hash'
+    ELSE 'unknown'
+  END AS partition_type,
+  part_defs.parisdefault   AS is_default,
+  array_agg(att.attname ORDER BY att.attnum) AS partition_columns,
+  part_defs.partition_definition,
+
+  -- range start / end (text)
+  CASE WHEN part_defs.parkind = 'r'
+       THEN regexp_replace(part_defs.partition_definition,
+                           '.*START ''([^'']*)''.*', E'\\1')
+       ELSE NULL
+  END AS range_start,
+  CASE WHEN part_defs.parkind = 'r'
+       THEN regexp_replace(part_defs.partition_definition,
+                           '.*END ''([^'']*)''.*', E'\\1')
+       ELSE NULL
+  END AS range_end,
+
+  -- list values (text inside IN(...))
+  CASE WHEN part_defs.parkind = 'l'
+       THEN regexp_replace(part_defs.partition_definition,
+                           E'.*IN \\(([^)]*)\\).*', E'\\1')
+       ELSE NULL
+  END AS list_values,
+
+  -- hash modulus / remainder (parsed integers from definition)
+  CASE WHEN part_defs.parkind = 'h'
+       THEN regexp_replace(part_defs.partition_definition,
+                           E'.*modulus ([0-9]+).*', E'\\1')::int
+       ELSE NULL
+  END AS hash_modulus,
+  CASE WHEN part_defs.parkind = 'h'
+       THEN regexp_replace(part_defs.partition_definition,
+                           E'.*remainder ([0-9]+).*', E'\\1')::int
+       ELSE NULL
+  END AS hash_remainder
+
+FROM part_defs
+JOIN pg_class c_child ON c_child.oid = part_defs.parchildrelid
+LEFT JOIN LATERAL (
+  SELECT attname, attnum
+  FROM pg_attribute
+  WHERE attrelid = part_defs.parrelid
+    AND attnum = ANY (part_defs.paratts)
+) att ON true
+GROUP BY
+  c_child.relname,
+  part_defs.parkind,
+  part_defs.parisdefault,
+  part_defs.partition_definition
+ORDER BY c_child.relname;

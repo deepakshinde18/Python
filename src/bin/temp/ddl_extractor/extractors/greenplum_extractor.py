@@ -349,7 +349,7 @@ class GreenplumDDLExtractor:
 
 
 SELECT
-    pr.parname AS partition_name,
+    c_child.relname AS partition_name,
     CASE p.parkind
         WHEN 'r' THEN 'range'
         WHEN 'l' THEN 'list'
@@ -369,6 +369,8 @@ JOIN
     pg_class t ON t.oid = p.parrelid
 JOIN
     pg_namespace n ON n.oid = t.relnamespace
+JOIN
+    pg_class c_child ON c_child.oid = pr.parchildrelid  -- get actual partition table
 LEFT JOIN
     LATERAL (
         SELECT attname, attnum
@@ -380,12 +382,11 @@ WHERE
     n.nspname = %s
     AND t.relname = %s
 GROUP BY
-    pr.parname,
+    c_child.relname,
     p.parkind,
     pr.parisdefault,
     pr.parrangestart,
     pr.parrangeend,
     pr.parlistvalues
 ORDER BY
-    pr.parruleord;
-
+    c_child.relname;

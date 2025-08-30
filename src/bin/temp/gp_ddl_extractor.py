@@ -163,10 +163,10 @@ class DDLExtractor:
 
     #### below is the updated for load partition to include list partition
 
-        def load_partitions(self, fq_table: str) -> List[str]:
+            def load_partitions(self, fq_table: str) -> List[str]:
         """
         Convert Greenplum partitions into Postgres PARTITION OF statements.
-        Supports RANGE and LIST partitions.
+        Supports RANGE, LIST, and DEFAULT partitions.
         """
         schema, table = self._split_qualified(fq_table)
         parts_sqls: List[str] = []
@@ -176,7 +176,8 @@ class DDLExtractor:
                     SELECT partitiontablename,
                            partitionrangestart,
                            partitionrangeend,
-                           partitionlistvalues
+                           partitionlistvalues,
+                           partitionisdefault
                     FROM pg_partitions
                     WHERE schemaname = %s AND tablename = %s
                     ORDER BY partitionrangestart, partitionlistvalues
@@ -187,9 +188,13 @@ class DDLExtractor:
                     start = row["partitionrangestart"]
                     end = row["partitionrangeend"]
                     listvals = row["partitionlistvalues"]
+                    is_default = row["partitionisdefault"]
 
-                    if listvals:  # LIST partition
-                        # Example in GP: '1,2,3' → need parentheses in PG
+                    if is_default:  # DEFAULT partition
+                        sql_stmt = (
+                            f"CREATE TABLE {schema}.{pname} PARTITION OF {schema}.{table} DEFAULT;"
+                        )
+                    elif listvals:  # LIST partition
                         sql_stmt = (
                             f"CREATE TABLE {schema}.{pname} PARTITION OF {schema}.{table} "
                             f"FOR VALUES IN ({listvals});"
@@ -200,7 +205,7 @@ class DDLExtractor:
                             f"FOR VALUES FROM ('{start}') TO ('{end}');"
                         )
                     else:
-                        continue  # unsupported type (HASH, DEFAULT, etc.)
+                        continue  # HASH or unsupported type for now
 
                     parts_sqls.append(sql_stmt)
 

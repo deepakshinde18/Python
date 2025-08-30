@@ -57,6 +57,23 @@ class GreenplumDDLExtractor:
                 strategy = PartitionStrategyRegistry.get(row["partitiontype"])
                 return strategy.parent_clause(row["partitioncolumn"]) if strategy else None
 
+    def generate_full_script(self, fq_table: str, include_if_not_exists: bool = True) -> str:
+        """
+        Generate a full DDL script for Postgres:
+        - parent table (with PARTITION BY if applicable)
+        - all child partitions (RANGE, LIST, HASH, DEFAULT)
+        """
+        # Load parent definition
+        tdef = self.load_table_def(fq_table)
+        parent_sql = self.to_postgres_ddl(tdef, include_if_not_exists=include_if_not_exists)
+
+        # Load child partitions
+        child_sqls = self.load_partitions(fq_table)
+
+        # Assemble full script
+        full_script = "\n\n".join([parent_sql] + child_sqls)
+        return full_script
+    
     @staticmethod
     def _split_qualified(fq: str):
         if '.' in fq:

@@ -467,3 +467,35 @@ GROUP BY
 ORDER BY
     c_child.relname;
 
+from sqlglot import exp, parse_one
+
+sql = """
+CREATE TABLE deepak.test_part_1
+PARTITION OF deepak.test
+FOR VALUES FROM ('2025-01-01'::date) TO ('2026-01-01')
+"""
+
+expr = parse_one(sql, read="postgres")
+print(expr)
+
+# new schema and parent mapping
+new_schema = "mona"
+parent_map = {"test": "test1"}  # only change parent "test" → "test1"
+
+# change child table schema (CREATE TABLE ...)
+child_table = expr.this
+if isinstance(child_table, exp.Table) and child_table.args.get("db"):
+    child_table.set("db", new_schema)
+
+# change parent table schema + name (PARTITION OF ...)
+parent_table = expr.args.get("part_of")
+if isinstance(parent_table, exp.Table):
+    if parent_table.args.get("db"):
+        parent_table.set("db", new_schema)
+    if parent_table.name in parent_map:
+        parent_table.set(
+            "this", exp.to_identifier(parent_map[parent_table.name])
+        )
+
+print(expr.sql(dialect="postgres"))
+

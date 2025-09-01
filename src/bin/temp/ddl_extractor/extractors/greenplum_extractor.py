@@ -467,35 +467,87 @@ GROUP BY
 ORDER BY
     c_child.relname;
 
+
+
+
 from sqlglot import exp, parse_one
 
-sql = """
-CREATE TABLE deepak.test_part_1
-PARTITION OF deepak.test
+
+def rewrite_create(expr: exp.Create, new_schema: str, table_map: dict):
+    """
+    Rewrite a CREATE TABLE statement (root or child partition):
+      - Replace schema with `new_schema`
+      - Rename table if in `table_map`
+    """
+
+    # --- Handle root partitioned table (this = Schema) ---
+    if isinstance(expr.this, exp.Schema):
+        schema_expr = expr.this
+        table_expr = schema_expr.this  # the Table inside Schema
+        if isinstance(table_expr, exp.Table):
+            # Update schema
+            if table_expr.args.get("db"):
+                table_expr.set("db", new_schema)
+            # Update table name if mapped
+            if table_expr.name in table_map:
+                table_expr.set(
+                    "this", exp.to_identifier(table_map[table_expr.name])
+                )
+
+    # --- Handle child partition (this = Table) ---
+    elif isinstance(expr.this, exp.Table):
+        table_expr = expr.this
+        if table_expr.args.get("db"):
+            table_expr.set("db", new_schema)
+        if table_expr.name in table_map:
+            table_expr.set(
+                "this", exp.to_identifier(table_map[table_expr.name])
+            )
+
+    # --- Handle PARTITION OF (parent reference in properties) ---
+    for prop in expr.args.get("properties", []):
+        if isinstance(prop, exp.PartitionedOfProperty):
+            parent_table = prop.this
+            if isinstance(parent_table, exp.Table):
+                if parent_table.args.get("db"):
+                    parent_table.set("db", new_schema)
+                if parent_table.name in table_map:
+                    parent_table.set(
+                        "this", exp.to_identifier(table_map[parent_table.name])
+                    )
+
+    return expr
+
+
+# ------------------- Example 1: root partitioned table -------------------
+sql1 = """
+CREATE TABLE test.test (
+    id int not null,
+    name string not null,
+    sale_date date
+)
+PARTITION BY RANGE (sale_date)
+"""
+
+expr1 = parse_one(sql1, read="postgres")
+expr1 = rewrite_create(
+    expr1, new_schema="deepak", table_map={"test": "deepak"}
+)
+print(expr1.sql(dialect="postgres"))
+
+
+# ------------------- Example 2: child partition -------------------
+sql2 = """
+CREATE TABLE test.test_part_1
+PARTITION OF test.test
 FOR VALUES FROM ('2025-01-01'::date) TO ('2026-01-01')
 """
 
-expr = parse_one(sql, read="postgres")
-print(expr)
+expr2 = parse_one(sql2, read="postgres")
+expr2 = rewrite_create(
+    expr2, new_schema="deepak", table_map={"test": "deepak"}
+)
+print(expr2.sql(dialect="postgres"))
 
-# new schema and parent mapping
-new_schema = "mona"
-parent_map = {"test": "test1"}  # only change parent "test" → "test1"
 
-# change child table schema (CREATE TABLE ...)
-child_table = expr.this
-if isinstance(child_table, exp.Table) and child_table.args.get("db"):
-    child_table.set("db", new_schema)
-
-# change parent table schema + name (PARTITION OF ...)
-parent_table = expr.args.get("part_of")
-if isinstance(parent_table, exp.Table):
-    if parent_table.args.get("db"):
-        parent_table.set("db", new_schema)
-    if parent_table.name in parent_map:
-        parent_table.set(
-            "this", exp.to_identifier(parent_map[parent_table.name])
-        )
-
-print(expr.sql(dialect="postgres"))
 

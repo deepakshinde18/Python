@@ -519,35 +519,41 @@ def rewrite_create(expr: exp.Create, new_schema: str, table_map: dict):
     return expr
 
 
-# ------------------- Example 1: root partitioned table -------------------
-sql1 = """
-CREATE TABLE test.test (
-    id int not null,
-    name string not null,
-    sale_date date
-)
-PARTITION BY RANGE (sale_date)
-"""
+SELECT
+    a.attname AS column_name,
+    t.typname AS data_type,
+    CASE WHEN a.attnotnull THEN 'NO' ELSE 'YES' END AS is_nullable,
+    pg_get_expr(ad.adbin, ad.adrelid) AS column_default,
+    CASE
+        WHEN t.typname IN ('varchar','bpchar') THEN a.atttypmod - 4
+        ELSE NULL
+    END AS character_maximum_length,
+    CASE
+        WHEN t.typname IN ('numeric','decimal') THEN
+            ((a.atttypmod - 4) >> 16) & 65535
+        ELSE NULL
+    END AS numeric_precision,
+    CASE
+        WHEN t.typname IN ('numeric','decimal') THEN
+            (a.atttypmod - 4) & 65535
+        ELSE NULL
+    END AS numeric_scale
+FROM pg_attribute a
+JOIN pg_class c
+  ON a.attrelid = c.oid
+JOIN pg_namespace n
+  ON c.relnamespace = n.oid
+JOIN pg_type t
+  ON a.atttypid = t.oid
+LEFT JOIN pg_attrdef ad
+  ON a.attrelid = ad.adrelid
+ AND a.attnum   = ad.adnum
+WHERE a.attnum > 0
+  AND NOT a.attisdropped
+  AND n.nspname = 'myschema'   -- schema filter
+  AND c.relname = 'mytable'    -- table filter
+ORDER BY a.attnum;
 
-expr1 = parse_one(sql1, read="postgres")
-expr1 = rewrite_create(
-    expr1, new_schema="deepak", table_map={"test": "deepak"}
-)
-print(expr1.sql(dialect="postgres"))
-
-
-# ------------------- Example 2: child partition -------------------
-sql2 = """
-CREATE TABLE test.test_part_1
-PARTITION OF test.test
-FOR VALUES FROM ('2025-01-01'::date) TO ('2026-01-01')
-"""
-
-expr2 = parse_one(sql2, read="postgres")
-expr2 = rewrite_create(
-    expr2, new_schema="deepak", table_map={"test": "deepak"}
-)
-print(expr2.sql(dialect="postgres"))
 
 
 

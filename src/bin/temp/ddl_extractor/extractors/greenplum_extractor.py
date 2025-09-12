@@ -554,6 +554,36 @@ WHERE a.attnum > 0
   AND c.relname = 'mytable'    -- table filter
 ORDER BY a.attnum;
 
+import psycopg2
+from psycopg2 import sql
+
+SRC_DSN = "postgresql://user:password@src_host:5432/src_db"
+DST_DSN = "postgresql://user:password@dst_host:5432/dst_db"
+TABLE_NAME = "your_table"
+
+def copy_table():
+    with psycopg2.connect(SRC_DSN) as src_conn, psycopg2.connect(DST_DSN) as dst_conn:
+        with src_conn.cursor() as src_cur, dst_conn.cursor() as dst_cur:
+            copy_out = sql.SQL("COPY {} TO STDOUT (FORMAT BINARY)").format(sql.Identifier(TABLE_NAME))
+            copy_in = sql.SQL("COPY {} FROM STDIN (FORMAT BINARY)").format(sql.Identifier(TABLE_NAME))
+
+            # Use cursor.copy_expert with file-like interfaces
+            with dst_cur.copy(copy_in.as_string(dst_cur)) as dst_copy:
+                with src_cur.copy(copy_out.as_string(src_cur)) as src_copy:
+                    # Read and write in chunks
+                    while True:
+                        chunk = src_copy.read(8192)  # 8KB chunks
+                        if not chunk:
+                            break
+                        dst_copy.write(chunk)
+
+            dst_conn.commit()
+
+if __name__ == "__main__":
+    copy_table()
+    print(f"Table {TABLE_NAME} copied successfully!")
+
+
 
 
 
